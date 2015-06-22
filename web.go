@@ -12,6 +12,7 @@ import (
 
 var idChars = []rune("0123456789abcdef")
 var idLength = 32
+
 func randId() string {
 	b := make([]rune, idLength)
 	for i := range b {
@@ -21,8 +22,8 @@ func randId() string {
 }
 
 type Broker struct {
-	idByClient        map[chan string]string
-	clientById        map[string]chan string
+	idByClient     map[chan string]string
+	clientById     map[string]chan string
 	newClients     chan chan string
 	defunctClients chan chan string
 	messages       chan string
