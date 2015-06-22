@@ -21,15 +21,14 @@ func randId() string {
 	return string(b)
 }
 
-type Broker struct {
+type Clients struct {
 	idByClient     map[chan string]string
 	clientById     map[string]chan string
 	newClients     chan chan string
 	defunctClients chan chan string
-	messages       chan string
 }
 
-func (b *Broker) Start() {
+func (b *Clients) Start() {
 	for {
 		select {
 		case s := <-b.newClients:
@@ -42,15 +41,11 @@ func (b *Broker) Start() {
 			delete(b.idByClient, s)
 			delete(b.clientById, id)
 			fmt.Printf("disconnected %s\n", id)
-		case msg := <-b.messages:
-			for s, _ := range b.idByClient {
-				s <- msg
-			}
 		}
 	}
 }
 
-func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (b *Clients) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
@@ -82,7 +77,7 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 var pattern = regexp.MustCompile(`(\S+) (\S+) (\S+)`)
 
-func ReadCommands(messages chan string) {
+func ReadCommands(clients *Clients) {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		line, err := reader.ReadString('\n')
@@ -99,7 +94,9 @@ func ReadCommands(messages chan string) {
 		params := parts[3]
 		switch command {
 		case "send":
-			messages <- params
+			for s, _ := range clients.idByClient {
+				s <- params
+			}
 		default:
 			fmt.Fprintf(os.Stderr, "Invalid command "+command)
 		}
@@ -109,18 +106,17 @@ func ReadCommands(messages chan string) {
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	b := &Broker{
+	clients := &Clients{
 		make(map[chan string]string),
 		make(map[string]chan string),
 		make(chan (chan string)),
 		make(chan (chan string)),
-		make(chan string),
 	}
 
-	go b.Start()
-	http.Handle("/events/", b)
+	go clients.Start()
+	http.Handle("/events/", clients)
 
-	go ReadCommands(b.messages)
+	go ReadCommands(clients)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "index.html")
