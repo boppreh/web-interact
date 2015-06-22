@@ -23,24 +23,24 @@ func randId() string {
 }
 
 type Clients struct {
-	idByClient     map[chan string]string
-	clientById     map[string]chan string
-	newClients     chan chan string
-	defunctClients chan chan string
+	channelById     map[string]chan string
+	newClients     chan newClient
+	defunctClients chan string
 }
 
-func (b *Clients) Start() {
+type newClient struct {
+    id string
+    channel chan string
+}
+
+func (c *Clients) Start() {
 	for {
 		select {
-		case s := <-b.newClients:
-			id := randId()
-			b.idByClient[s] = id
-			b.clientById[id] = s
-			fmt.Printf("connected %s %d\n", id, time.Now().Unix())
-		case s := <-b.defunctClients:
-			id := b.idByClient[s]
-			delete(b.idByClient, s)
-			delete(b.clientById, id)
+		case client := <-c.newClients:
+			c.channelById[client.id] = client.channel
+			fmt.Printf("connected %s %d\n", client.id, time.Now().Unix())
+		case id := <-c.defunctClients:
+			delete(c.channelById, id)
 			fmt.Printf("disconnected %s %d\n", id, time.Now().Unix())
 		}
 	}
@@ -53,13 +53,14 @@ func (b *Clients) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+    id := randId()
 	messageChan := make(chan string)
-	b.newClients <- messageChan
+	b.newClients <- newClient{id, messageChan}
 
 	notify := w.(http.CloseNotifier).CloseNotify()
 	go func() {
 		<-notify
-		b.defunctClients <- messageChan
+		b.defunctClients <- id
 	}()
 
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -96,11 +97,11 @@ func ReadCommands(clients *Clients) {
 		switch command {
 		case "send":
 			if id == "world" {
-				for s, _ := range clients.idByClient {
+				for _, s := range clients.channelById {
 					s <- params
 				}
 			} else {
-				clients.clientById[id] <- params
+				clients.channelById[id] <- params
 			}
 		default:
 			fmt.Fprintf(os.Stderr, "Invalid command "+command+"\n")
@@ -122,10 +123,9 @@ func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	clients := &Clients{
-		make(map[chan string]string),
 		make(map[string]chan string),
-		make(chan (chan string)),
-		make(chan (chan string)),
+		make(chan newClient),
+		make(chan string),
 	}
 
 	go clients.Start()
