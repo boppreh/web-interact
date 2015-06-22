@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
@@ -107,6 +108,16 @@ func ReadCommands(clients *Clients) {
 	}
 }
 
+func HandleCall(w http.ResponseWriter, r *http.Request) {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading body.", http.StatusInternalServerError)
+		fmt.Fprintf(os.Stderr, err.Error())
+		return
+	}
+	fmt.Printf("call %s\n", body)
+}
+
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
@@ -122,6 +133,7 @@ func main() {
 
 	go ReadCommands(clients)
 
+	http.Handle("/call", http.HandlerFunc(HandleCall))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "index.html")
 	})
