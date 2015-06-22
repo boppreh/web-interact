@@ -90,12 +90,16 @@ func ReadCommands(clients *Clients) {
 			continue
 		}
 		command := parts[1]
-		//id := parts[2]
+		id := parts[2]
 		params := parts[3]
 		switch command {
 		case "send":
-			for s, _ := range clients.idByClient {
-				s <- params
+			if id == "world" {
+				for s, _ := range clients.idByClient {
+					s <- params
+				}
+			} else {
+				clients.clientById[id] <- params
 			}
 		default:
 			fmt.Fprintf(os.Stderr, "Invalid command "+command)
