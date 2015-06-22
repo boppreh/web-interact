@@ -11,9 +11,9 @@ import (
 )
 
 var idChars = []rune("0123456789abcdef")
-
+var idLength = 32
 func randId() string {
-	b := make([]rune, 32)
+	b := make([]rune, idLength)
 	for i := range b {
 		b[i] = idChars[rand.Intn(len(idChars))]
 	}
@@ -21,7 +21,8 @@ func randId() string {
 }
 
 type Broker struct {
-	clients        map[chan string]string
+	idByClient        map[chan string]string
+	clientById        map[string]chan string
 	newClients     chan chan string
 	defunctClients chan chan string
 	messages       chan string
@@ -32,14 +33,16 @@ func (b *Broker) Start() {
 		select {
 		case s := <-b.newClients:
 			id := randId()
-			b.clients[s] = id
-			fmt.Printf("Connected: %s\n", id)
+			b.idByClient[s] = id
+			b.clientById[id] = s
+			fmt.Printf("connected %s\n", id)
 		case s := <-b.defunctClients:
-			id := b.clients[s]
-			delete(b.clients, s)
-			fmt.Printf("Disconnected: %s\n", id)
+			id := b.idByClient[s]
+			delete(b.idByClient, s)
+			delete(b.clientById, id)
+			fmt.Printf("disconnected %s\n", id)
 		case msg := <-b.messages:
-			for s, _ := range b.clients {
+			for s, _ := range b.idByClient {
 				s <- msg
 			}
 		}
@@ -95,6 +98,7 @@ func main() {
 
 	b := &Broker{
 		make(map[chan string]string),
+		make(map[string]chan string),
 		make(chan (chan string)),
 		make(chan (chan string)),
 		make(chan string),
