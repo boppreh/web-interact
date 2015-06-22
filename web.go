@@ -35,12 +35,12 @@ func (b *Clients) Start() {
 			id := randId()
 			b.idByClient[s] = id
 			b.clientById[id] = s
-			fmt.Printf("connected %s\n", id)
+			fmt.Printf("connected %s %d\n", id, time.Now().Unix())
 		case s := <-b.defunctClients:
 			id := b.idByClient[s]
 			delete(b.idByClient, s)
 			delete(b.clientById, id)
-			fmt.Printf("disconnected %s\n", id)
+			fmt.Printf("disconnected %s %d\n", id, time.Now().Unix())
 		}
 	}
 }
@@ -86,7 +86,7 @@ func ReadCommands(clients *Clients) {
 		}
 		parts := pattern.FindStringSubmatch(line)
 		if len(parts) == 0 {
-			fmt.Fprintf(os.Stderr, "Invalid command format. Expected 'command id params'.")
+			fmt.Fprintf(os.Stderr, "Invalid command format. Expected 'command id params'.\n")
 			continue
 		}
 		command := parts[1]
@@ -102,7 +102,7 @@ func ReadCommands(clients *Clients) {
 				clients.clientById[id] <- params
 			}
 		default:
-			fmt.Fprintf(os.Stderr, "Invalid command "+command)
+			fmt.Fprintf(os.Stderr, "Invalid command "+command+"\n")
 		}
 	}
 }
