@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"html/template"
 	"math/rand"
 	"net/http"
 	"os"
@@ -80,18 +79,15 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var responseTemplate = template.Must(template.ParseFiles("template.html"))
-
-func MainPageHandler(w http.ResponseWriter, r *http.Request) {
-	// Did you know Golang's ServeMux matches only the
-	// prefix of the request URL?  It's true.  Here we
-	// insist the path is just "/".
-	if r.URL.Path != "/" {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	responseTemplate.Execute(w, "")
+func ReadCommands(messages chan string) {
+    reader := bufio.NewReader(os.Stdin)
+    for {
+        line, err := reader.ReadString('\n')
+        if err != nil {
+            panic(err)
+        }
+        messages <- line
+    }
 }
 
 func main() {
@@ -108,17 +104,10 @@ func main() {
 	go b.Start()
 	http.Handle("/events/", b)
 
-	go func() {
-		reader := bufio.NewReader(os.Stdin)
-		for {
-			line, err := reader.ReadString('\n')
-			if err != nil {
-				panic(err)
-			}
-			b.messages <- line
-		}
-	}()
+	go ReadCommands(b.messages)
 
-	http.Handle("/", http.HandlerFunc(MainPageHandler))
+    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+        http.ServeFile(w, r, "index.html")
+    })
 	panic(http.ListenAndServe(":8000", nil))
 }
