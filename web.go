@@ -69,6 +69,8 @@ func (b *Clients) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Tell nginx to not buffer. Without this it may take up to a minute
 	// for events to arrive at the client.
 	w.Header().Set("X-Accel-Buffering", "no")
+	fmt.Fprintf(w, "\n\n")
+	f.Flush()
 
 	for {
 		msg := <-messageChan
