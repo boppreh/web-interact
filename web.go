@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"regexp"
 	"time"
 )
 
@@ -79,15 +80,30 @@ func (b *Broker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+var pattern = regexp.MustCompile(`(\S+) (\S+) (\S+)`)
+
 func ReadCommands(messages chan string) {
-    reader := bufio.NewReader(os.Stdin)
-    for {
-        line, err := reader.ReadString('\n')
-        if err != nil {
-            panic(err)
-        }
-        messages <- line
-    }
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			panic(err)
+		}
+		parts := pattern.FindStringSubmatch(line)
+		if len(parts) == 0 {
+			fmt.Fprintf(os.Stderr, "Invalid command format. Expected 'command id params'.")
+			continue
+		}
+		command := parts[1]
+		//id := parts[2]
+		params := parts[3]
+		switch command {
+		case "send":
+			messages <- params
+		default:
+			fmt.Fprintf(os.Stderr, "Invalid command "+command)
+		}
+	}
 }
 
 func main() {
@@ -106,8 +122,8 @@ func main() {
 
 	go ReadCommands(b.messages)
 
-    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-        http.ServeFile(w, r, "index.html")
-    })
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "index.html")
+	})
 	panic(http.ListenAndServe(":8000", nil))
 }
