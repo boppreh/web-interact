@@ -23,14 +23,14 @@ func randId() string {
 }
 
 type Clients struct {
-	channelById     map[string]chan string
+	channelById    map[string]chan string
 	newClients     chan newClient
 	defunctClients chan string
 }
 
 type newClient struct {
-    id string
-    channel chan string
+	id      string
+	channel chan string
 }
 
 func (c *Clients) Start() {
@@ -53,7 +53,7 @@ func (b *Clients) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-    id := randId()
+	id := randId()
 	messageChan := make(chan string)
 	b.newClients <- newClient{id, messageChan}
 
