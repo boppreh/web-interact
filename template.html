@@ -1,0 +1,11 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Web Interactivity</title>
+    </head>
+    <body>
+        <script>
+            new EventSource('/events').onmessage = function(e) { eval(e.data); }
+        </script>
+    </body>
+</html>
