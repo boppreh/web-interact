@@ -118,7 +118,7 @@ func HandleCall(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(os.Stderr, err.Error())
 		return
 	}
-	fmt.Printf("call %s\n", body)
+	fmt.Printf("call %s %s\n", r.URL.Path, body)
 }
 
 func main() {
@@ -131,11 +131,11 @@ func main() {
 	}
 
 	go clients.Start()
-	http.Handle("/events/", clients)
+	http.Handle("/events", clients)
 
 	go ReadCommands(clients)
 
-	http.Handle("/call", http.HandlerFunc(HandleCall))
+	http.Handle("/call/", http.StripPrefix("/call/", http.HandlerFunc(HandleCall)))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "index.html")
 	})
