@@ -3,10 +3,11 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"net/http"
-	"os"
 	"regexp"
 	"time"
 )
@@ -33,15 +34,15 @@ type newClient struct {
 	channel chan string
 }
 
-func (c *Clients) Start() {
+func (c *Clients) Start(conn net.Conn) {
 	for {
 		select {
 		case client := <-c.newClients:
 			c.channelById[client.id] = client.channel
-			fmt.Printf("connected %s %d\n", client.id, time.Now().Unix())
+			fmt.Fprintf(conn, "connected %s %d\n", client.id, time.Now().Unix())
 		case id := <-c.defunctClients:
 			delete(c.channelById, id)
-			fmt.Printf("disconnected %s %d\n", id, time.Now().Unix())
+			fmt.Fprintf(conn, "disconnected %s %d\n", id, time.Now().Unix())
 		}
 	}
 }
@@ -81,16 +82,21 @@ func (b *Clients) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 var pattern = regexp.MustCompile(`(\S+) (\S+) (\S+)`)
 
-func ReadCommands(clients *Clients) {
-	reader := bufio.NewReader(os.Stdin)
+func ReadCommands(conn net.Conn, clients *Clients) {
+	reader := bufio.NewReader(conn)
 	for {
 		line, err := reader.ReadString('\n')
+		fmt.Println(line)
+		if err == io.EOF {
+			fmt.Println("Command center client disconnected.")
+			return
+		}
 		if err != nil {
 			panic(err)
 		}
 		parts := pattern.FindStringSubmatch(line)
 		if len(parts) == 0 {
-			fmt.Fprintf(os.Stderr, "Invalid command format. Expected 'command id params'.\n")
+			fmt.Println("Invalid command format. Expected 'command id params'.\n")
 			continue
 		}
 		command := parts[1]
@@ -106,22 +112,23 @@ func ReadCommands(clients *Clients) {
 				clients.channelById[id] <- params
 			}
 		default:
-			fmt.Fprintf(os.Stderr, "Invalid command "+command+"\n")
+			fmt.Println("Invalid command " + command + "\n")
 		}
 	}
 }
 
-func HandleCall(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Error reading body.", http.StatusInternalServerError)
-		fmt.Fprintf(os.Stderr, err.Error())
-		return
-	}
-	fmt.Printf("call %s %s\n", r.URL.Path, body)
-}
-
 func main() {
+	fmt.Println("Listening for command center client at :8001.")
+	ln, err := net.Listen("tcp", ":8001")
+	if err != nil {
+		panic(err.Error())
+	}
+	conn, err := ln.Accept()
+	if err != nil {
+		panic(err.Error())
+	}
+
+	fmt.Println("Command center client connected. Starting webserver.")
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	clients := &Clients{
@@ -130,12 +137,20 @@ func main() {
 		make(chan string),
 	}
 
-	go clients.Start()
+	go clients.Start(conn)
 	http.Handle("/events", clients)
 
-	go ReadCommands(clients)
+	go ReadCommands(conn, clients)
 
-	http.Handle("/call/", http.StripPrefix("/call/", http.HandlerFunc(HandleCall)))
+	http.Handle("/call/", http.StripPrefix("/call/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Error reading body.", http.StatusInternalServerError)
+			fmt.Println(err)
+			return
+		}
+		fmt.Fprintf(conn, "call %s %s\n", r.URL.Path, body)
+	})))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "index.html")
 	})
