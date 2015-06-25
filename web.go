@@ -111,7 +111,6 @@ func ReadCommands(conn net.Conn, clients *Clients) {
 	reader := bufio.NewReader(conn)
 	for {
 		line, err := reader.ReadString('\n')
-		fmt.Println(line)
 		if err == io.EOF {
 			// If the socket is closed we will be having connection errors
 			// everywhere when we try to report events. Best to close
