@@ -27,11 +27,17 @@ type Clients struct {
 	channelById    map[string]chan string
 	newClients     chan newClient
 	defunctClients chan string
+	calls          chan rpcCall
 }
 
 type newClient struct {
 	id      string
 	channel chan string
+}
+
+type rpcCall struct {
+	id     string
+	body   string
 }
 
 func (c *Clients) Start(conn net.Conn) {
@@ -43,33 +49,48 @@ func (c *Clients) Start(conn net.Conn) {
 		case id := <-c.defunctClients:
 			delete(c.channelById, id)
 			fmt.Fprintf(conn, "disconnected %s %d\n", id, time.Now().Unix())
+		case call := <-c.calls:
+			fmt.Fprintf(conn, "call %s %s\n", call.id, call.body)
 		}
 	}
 }
 
-func (b *Clients) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (c *Clients) processCall(w http.ResponseWriter, r *http.Request) {
+    body, err := ioutil.ReadAll(r.Body)
+    if err != nil {
+        http.Error(w, "Error reading body.", http.StatusInternalServerError)
+        fmt.Println(err)
+        return
+    }
+    c.calls <- rpcCall{r.URL.Path, string(body)}
+}
+
+func (c *Clients) processStream(w http.ResponseWriter, r *http.Request) {
 	f, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
 		return
 	}
 
-	id := randId()
+	id := r.URL.Path
 	messageChan := make(chan string)
-	b.newClients <- newClient{id, messageChan}
+	c.newClients <- newClient{id, messageChan}
 
 	notify := w.(http.CloseNotifier).CloseNotify()
 	go func() {
 		<-notify
-		b.defunctClients <- id
+		c.defunctClients <- id
 	}()
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+
 	// Tell nginx to not buffer. Without this it may take up to a minute
 	// for events to arrive at the client.
 	w.Header().Set("X-Accel-Buffering", "no")
+
+	// Send something to force the headers to flush.
 	fmt.Fprintf(w, "\n\n")
 	f.Flush()
 
@@ -80,7 +101,7 @@ func (b *Clients) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var pattern = regexp.MustCompile(`(\S+) (\S+) (\S+)`)
+var pattern = regexp.MustCompile(`(\S+) (\S+) (.+)`)
 
 func ReadCommands(conn net.Conn, clients *Clients) {
 	reader := bufio.NewReader(conn)
@@ -88,8 +109,10 @@ func ReadCommands(conn net.Conn, clients *Clients) {
 		line, err := reader.ReadString('\n')
 		fmt.Println(line)
 		if err == io.EOF {
-			fmt.Println("Command center client disconnected.")
-			return
+            // If the socket is closed we will be having connection errors
+            // everywhere when we try to report events. Best to close
+            // everything.
+            panic("Command center client disconnected.")
 		}
 		if err != nil {
 			panic(err)
@@ -117,42 +140,48 @@ func ReadCommands(conn net.Conn, clients *Clients) {
 	}
 }
 
-func main() {
+func waitForClient() net.Conn {
 	fmt.Println("Listening for command center client at :8001.")
+
 	ln, err := net.Listen("tcp", ":8001")
 	if err != nil {
 		panic(err.Error())
 	}
+
 	conn, err := ln.Accept()
 	if err != nil {
 		panic(err.Error())
 	}
 
-	fmt.Println("Command center client connected. Starting webserver.")
+	fmt.Println("Command center client connected.")
+
+    return conn
+}
+
+func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
+
+    conn := waitForClient()
 
 	clients := &Clients{
 		make(map[string]chan string),
 		make(chan newClient),
 		make(chan string),
+		make(chan rpcCall),
 	}
 
 	go clients.Start(conn)
-	http.Handle("/events", clients)
 
 	go ReadCommands(conn, clients)
 
-	http.Handle("/call/", http.StripPrefix("/call/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, "Error reading body.", http.StatusInternalServerError)
-			fmt.Println(err)
-			return
-		}
-		fmt.Fprintf(conn, "call %s %s\n", r.URL.Path, body)
-	})))
+	http.Handle("/call/", http.StripPrefix("/call/", http.HandlerFunc(clients.processCall)))
+	http.Handle("/events/", http.StripPrefix("/events/", http.HandlerFunc(clients.processStream)))
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "index.html")
+	})
+	http.HandleFunc("/sse.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "sse.js")
 	})
 	panic(http.ListenAndServe(":8000", nil))
 }
