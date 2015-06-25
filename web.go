@@ -95,8 +95,12 @@ func (c *Clients) processStream(w http.ResponseWriter, r *http.Request) {
 	f.Flush()
 
 	for {
-		msg := <-messageChan
-		fmt.Fprintf(w, "data: %s\n\n", msg)
+		select {
+		case msg := <-messageChan:
+			fmt.Fprintf(w, "data: %s\n\n", msg)
+		case <-time.After(30 * time.Second):
+			fmt.Fprintf(w, ":heartbeat\n\n")
+		}
 		f.Flush()
 	}
 }
