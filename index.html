@@ -12,7 +12,8 @@
 
         <div id="chat"></div>
 
-        <form onsubmit="call('say', 'message');" action="javascript:void(0);">
+        <form onsubmit="call('say', 'message'); set('message', '');"
+            action="javascript:void(0);">
             <input type="text" id="message">
             <input type="submit" value="Send">
         </form>
