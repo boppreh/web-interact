@@ -36,8 +36,8 @@ type newClient struct {
 }
 
 type rpcCall struct {
-	id     string
-	body   string
+	id   string
+	body string
 }
 
 func (c *Clients) Start(conn net.Conn) {
@@ -56,13 +56,13 @@ func (c *Clients) Start(conn net.Conn) {
 }
 
 func (c *Clients) processCall(w http.ResponseWriter, r *http.Request) {
-    body, err := ioutil.ReadAll(r.Body)
-    if err != nil {
-        http.Error(w, "Error reading body.", http.StatusInternalServerError)
-        fmt.Println(err)
-        return
-    }
-    c.calls <- rpcCall{r.URL.Path, string(body)}
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading body.", http.StatusInternalServerError)
+		fmt.Println(err)
+		return
+	}
+	c.calls <- rpcCall{r.URL.Path, string(body)}
 }
 
 func (c *Clients) processStream(w http.ResponseWriter, r *http.Request) {
@@ -109,10 +109,10 @@ func ReadCommands(conn net.Conn, clients *Clients) {
 		line, err := reader.ReadString('\n')
 		fmt.Println(line)
 		if err == io.EOF {
-            // If the socket is closed we will be having connection errors
-            // everywhere when we try to report events. Best to close
-            // everything.
-            panic("Command center client disconnected.")
+			// If the socket is closed we will be having connection errors
+			// everywhere when we try to report events. Best to close
+			// everything.
+			panic("Command center client disconnected.")
 		}
 		if err != nil {
 			panic(err)
@@ -155,13 +155,13 @@ func waitForClient() net.Conn {
 
 	fmt.Println("Command center client connected.")
 
-    return conn
+	return conn
 }
 
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-    conn := waitForClient()
+	conn := waitForClient()
 
 	clients := &Clients{
 		make(map[string]chan string),
