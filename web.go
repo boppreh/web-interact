@@ -24,7 +24,8 @@ func randId() string {
 }
 
 type Clients struct {
-	subscriptions  map[string][]Client
+	clientsById    map[string]Client
+	subscriptions  map[string]map[Client]bool
 	newClients     chan Client
 	defunctClients chan string
 	calls          chan rpcCall
@@ -42,20 +43,18 @@ type rpcCall struct {
 }
 
 func (c *Clients) subscribe(id string, client Client) {
-	list, set := c.subscriptions[id]
+	_, set := c.subscriptions[id]
 	if !set {
-		c.subscriptions[id] = []Client{}
+		c.subscriptions[id] = map[Client]bool{client: true}
+	} else {
+		c.subscriptions[id][client] = true
 	}
-	c.subscriptions[id] = append(list, client)
 }
 
 func (c *Clients) unsubscribe(id string, client Client) {
-	list := c.subscriptions[id]
-	for i, other := range list {
-		if other == client {
-			c.subscriptions[id] = append(list[:i], list[i+1:]...)
-			return
-		}
+	delete(c.subscriptions[id], client)
+	if len(c.subscriptions[id]) == 0 {
+		delete(c.subscriptions, id)
 	}
 }
 
@@ -63,18 +62,20 @@ func (c *Clients) Start(conn net.Conn) {
 	for {
 		select {
 		case client := <-c.newClients:
-			c.subscriptions[client.id] = []Client{client}
+			c.clientsById[client.id] = client
+			c.subscribe(client.id, client)
 			c.subscribe(client.session, client)
 			c.subscribe("world", client)
 			fmt.Fprintf(conn, "connected %s %s\n", client.id, client.session)
 			fmt.Printf("-> connected %s %s\n", client.id, client.session)
 		case id := <-c.defunctClients:
-			client := c.subscriptions[id][0]
-			delete(c.subscriptions, id)
+			client := c.clientsById[id]
+			c.unsubscribe(client.id, client)
 			c.unsubscribe(client.session, client)
 			c.unsubscribe("world", client)
-			fmt.Fprintf(conn, "disconnected %s %d\n", id, time.Now().Unix())
-			fmt.Printf("-> disconnected %s %d\n", id, time.Now().Unix())
+			delete(c.clientsById, id)
+			fmt.Fprintf(conn, "disconnected %s %s\n", id, client.session)
+			fmt.Printf("-> disconnected %s %s\n", id, client.session)
 		case call := <-c.calls:
 			fmt.Fprintf(conn, "call %s %s\n", call.id, call.body)
 			fmt.Printf("-> call %s %s\n", call.id, call.body)
@@ -170,10 +171,10 @@ func ReadCommands(conn net.Conn, clients *Clients) {
 		command := parts[1]
 		id := parts[2]
 		params := parts[3]
-        fmt.Println("<- " + line)
+		fmt.Println("<- " + line)
 		switch command {
 		case "send":
-			for _, client := range clients.subscriptions[id] {
+			for client, _ := range clients.subscriptions[id] {
 				client.channel <- params
 			}
 		default:
@@ -206,7 +207,8 @@ func main() {
 	conn := waitForClient()
 
 	clients := &Clients{
-		make(map[string][]Client),
+		make(map[string]Client),
+		make(map[string]map[Client]bool),
 		make(chan Client),
 		make(chan string),
 		make(chan rpcCall),
