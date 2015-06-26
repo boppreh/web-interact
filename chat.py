@@ -7,7 +7,7 @@ class Session(SessionBase):
 
     def change_name(self, new_name):
         self.name = new_name
-        # self.set('name', self.name)
+        self.set('name', self.name)
 
 class Page(PageBase):
     def __init__(self, id, session):
