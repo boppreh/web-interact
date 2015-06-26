@@ -13,7 +13,10 @@ function randId(bits) {
 
 var pageid = "page" + randId(128);
 
-new EventSource('/events/' + pageid).onmessage = function(e) { eval(e.data); }
+new EventSource('/events/' + pageid).onmessage = function(e) {
+    console.log(e.data)
+    eval(e.data);
+}
 
 function call(method /*, elements*/) {
     var data = [];
