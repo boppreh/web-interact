@@ -67,14 +67,17 @@ func (c *Clients) Start(conn net.Conn) {
 			c.subscribe(client.session, client)
 			c.subscribe("world", client)
 			fmt.Fprintf(conn, "connected %s %d\n", client.id, client.session)
+			fmt.Printf("-> connected %s %d\n", client.id, client.session)
 		case id := <-c.defunctClients:
 			client := c.subscriptions[id][0]
 			delete(c.subscriptions, id)
 			c.unsubscribe(client.session, client)
 			c.unsubscribe("world", client)
 			fmt.Fprintf(conn, "disconnected %s %d\n", id, time.Now().Unix())
+			fmt.Printf("-> disconnected %s %d\n", id, time.Now().Unix())
 		case call := <-c.calls:
 			fmt.Fprintf(conn, "call %s %s\n", call.id, call.body)
+			fmt.Printf("-> call %s %s\n", call.id, call.body)
 		}
 	}
 }
@@ -170,6 +173,7 @@ func ReadCommands(conn net.Conn, clients *Clients) {
 		command := parts[1]
 		id := parts[2]
 		params := parts[3]
+        fmt.Println("<- " + line)
 		switch command {
 		case "send":
 			for _, client := range clients.subscriptions[id] {
