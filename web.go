@@ -24,13 +24,13 @@ func randId() string {
 }
 
 type Clients struct {
-	channelById    map[string]chan string
-	newClients     chan newClient
+	subscriptions  map[string][]Client
+	newClients     chan Client
 	defunctClients chan string
 	calls          chan rpcCall
 }
 
-type newClient struct {
+type Client struct {
 	id      string
 	session string
 	channel chan string
@@ -41,20 +41,46 @@ type rpcCall struct {
 	body string
 }
 
+func (c *Clients) subscribe(id string, client Client) {
+	list, set := c.subscriptions[id]
+	if !set {
+		c.subscriptions[id] = []Client{}
+	}
+	c.subscriptions[id] = append(list, client)
+}
+
+func (c *Clients) unsubscribe(id string, client Client) {
+	list := c.subscriptions[id]
+	for i, other := range list {
+		if other == client {
+			c.subscriptions[id] = append(list[:i], list[i+1:]...)
+			return
+		}
+	}
+}
+
 func (c *Clients) Start(conn net.Conn) {
 	for {
 		select {
 		case client := <-c.newClients:
-			c.channelById[client.id] = client.channel
+			c.subscriptions[client.id] = []Client{client}
+			c.subscribe(client.session, client)
+			c.subscribe("world", client)
 			fmt.Fprintf(conn, "connected %s %d\n", client.id, client.session)
 		case id := <-c.defunctClients:
-			delete(c.channelById, id)
+			client := c.subscriptions[id][0]
+			delete(c.subscriptions, id)
+			c.unsubscribe(client.session, client)
+			c.unsubscribe("world", client)
 			fmt.Fprintf(conn, "disconnected %s %d\n", id, time.Now().Unix())
 		case call := <-c.calls:
 			fmt.Fprintf(conn, "call %s %s\n", call.id, call.body)
 		}
 	}
 }
+
+//for _, s := range clients.subscriptions[id] {
+//}
 
 func (c *Clients) processCall(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
@@ -90,7 +116,7 @@ func (c *Clients) processStream(w http.ResponseWriter, r *http.Request) {
 
 	id := r.URL.Path
 	messageChan := make(chan string)
-	c.newClients <- newClient{id, sessionId, messageChan}
+	c.newClients <- Client{id, sessionId, messageChan}
 
 	notify := w.(http.CloseNotifier).CloseNotify()
 	go func() {
@@ -146,12 +172,8 @@ func ReadCommands(conn net.Conn, clients *Clients) {
 		params := parts[3]
 		switch command {
 		case "send":
-			if id == "world" {
-				for _, s := range clients.channelById {
-					s <- params
-				}
-			} else {
-				clients.channelById[id] <- params
+			for _, client := range clients.subscriptions[id] {
+				client.channel <- params
 			}
 		default:
 			fmt.Println("Invalid command " + command + "\n")
@@ -183,8 +205,8 @@ func main() {
 	conn := waitForClient()
 
 	clients := &Clients{
-		make(map[string]chan string),
-		make(chan newClient),
+		make(map[string][]Client),
+		make(chan Client),
 		make(chan string),
 		make(chan rpcCall),
 	}
