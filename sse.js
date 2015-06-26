@@ -11,7 +11,7 @@ function randId(bits) {
     return chars.join('');
 }
 
-var pageid = randId(128);
+var pageid = "page" + randId(128);
 
 new EventSource('/events/' + pageid).onmessage = function(e) { eval(e.data); }
 
