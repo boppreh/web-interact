@@ -66,8 +66,8 @@ func (c *Clients) Start(conn net.Conn) {
 			c.subscriptions[client.id] = []Client{client}
 			c.subscribe(client.session, client)
 			c.subscribe("world", client)
-			fmt.Fprintf(conn, "connected %s %d\n", client.id, client.session)
-			fmt.Printf("-> connected %s %d\n", client.id, client.session)
+			fmt.Fprintf(conn, "connected %s %s\n", client.id, client.session)
+			fmt.Printf("-> connected %s %s\n", client.id, client.session)
 		case id := <-c.defunctClients:
 			client := c.subscriptions[id][0]
 			delete(c.subscriptions, id)
