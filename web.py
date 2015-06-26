@@ -2,6 +2,7 @@ import socket
 import threading
 import re
 import json
+from collections import defaultdict
 
 from urllib.parse import quote
 from html import escape
@@ -36,20 +37,17 @@ class _VirtualElement(object):
                 value = escape(str(value))
             return 'decodeURIComponent("{}")'.format(quote(value))
 
+all_pages = {}
+all_sessions = {}
 
-def setup(PageCls, host='localhost', port=8001,
-          on_connected=lambda: None, on_disconnected=lambda: None):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(('localhost', 8001))
-    PageCls.all = {}
-    reader = s.makefile('r', encoding='utf-8')
-    writer = s.makefile('w', encoding='utf-8')
+class _Interactive(object):
+    socket_writer = None
 
     def send(self, message, target=None):
         target = target or self.id
         assert '\n' not in message 
-        writer.write('send {} {}\n'.format(target, message))
-        writer.flush()
+        _Interactive.socket_writer.write('send {} {}\n'.format(target, message))
+        _Interactive.socket_writer.flush()
 
     def broadcast(self, message):
         self.send(message, 'world')
@@ -65,27 +63,53 @@ def setup(PageCls, host='localhost', port=8001,
     def html(self, template, *values):
         return _Html(template, values)
 
-    PageCls.get = get
-    PageCls.set = set
-    PageCls.html = html
-    PageCls.send = send
-    PageCls.broadcast = broadcast
+class SessionBase(_Interactive):
+    def __init__(self, id, pages):
+        self.id = id
+        self.pages = pages
+
+class PageBase(_Interactive):
+    def __init__(self, id, session):
+        self.id = id
+        self.session = session
+
+def setup(PageCls=PageBase, SessionCls=SessionBase, host='localhost', port=8001,
+          on_connected=lambda: None, on_disconnected=lambda: None):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect(('localhost', 8001))
+    reader = s.makefile('r', encoding='utf-8')
+    writer = s.makefile('w', encoding='utf-8')
+    _Interactive.socket_writer = writer
 
     def subroutine():
         while True:
             line = reader.readline()
             event, id, params = re.match(r'(\S+) (\S+) (.+)', line).groups()
             if event == 'connected':
-                instance = PageCls()
-                instance.id = id
-                PageCls.all[id] = instance
+                session_id = params
+                if session_id in all_sessions:
+                    session = all_sessions[params]
+                else:
+                    session = SessionCls(session_id, {})
+                    all_sessions[session_id] = session
+                page = PageCls(id, session)
+                session.pages[id] = page
+                all_pages[id] = page
             elif event == 'disconnected':
-                del PageCls.all[id]
+                session = all_pages[id].session
+                del session.pages[id]
+                del all_pages[id]
             elif event == 'call':
                 call = json.loads(params)
                 # Nope, not falling for that.
                 if call['method'] in ['send', 'broadcast']:
                     continue
-                getattr(PageCls.all[id], call['method'])(*call['params'])
+                page = all_pages[id]
+                method = call['method']
+                try:
+                    getattr(page, method)(*call['params'])
+                except AttributeError:
+                    getattr(page.session, method)(*call['params'])
+
 
     threading.Thread(target=subroutine).start()
