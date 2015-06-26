@@ -82,9 +82,6 @@ func (c *Clients) Start(conn net.Conn) {
 	}
 }
 
-//for _, s := range clients.subscriptions[id] {
-//}
-
 func (c *Clients) processCall(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
