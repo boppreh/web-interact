@@ -32,6 +32,7 @@ type Clients struct {
 
 type newClient struct {
 	id      string
+	session string
 	channel chan string
 }
 
@@ -45,7 +46,7 @@ func (c *Clients) Start(conn net.Conn) {
 		select {
 		case client := <-c.newClients:
 			c.channelById[client.id] = client.channel
-			fmt.Fprintf(conn, "connected %s %d\n", client.id, time.Now().Unix())
+			fmt.Fprintf(conn, "connected %s %d\n", client.id, client.session)
 		case id := <-c.defunctClients:
 			delete(c.channelById, id)
 			fmt.Fprintf(conn, "disconnected %s %d\n", id, time.Now().Unix())
@@ -66,6 +67,21 @@ func (c *Clients) processCall(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Clients) processStream(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("session")
+	var sessionId string
+	if err == http.ErrNoCookie {
+		sessionId = "session" + randId()
+		http.SetCookie(w, &http.Cookie{Name: "session",
+			Value:    sessionId,
+			Path:     "/",
+			Expires:  time.Now().AddDate(1, 0, 0),
+			MaxAge:   60 * 60 * 24 * 365,
+			Secure:   true,
+			HttpOnly: true})
+	} else {
+		sessionId = cookie.Value
+	}
+
 	f, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
@@ -74,7 +90,7 @@ func (c *Clients) processStream(w http.ResponseWriter, r *http.Request) {
 
 	id := r.URL.Path
 	messageChan := make(chan string)
-	c.newClients <- newClient{id, messageChan}
+	c.newClients <- newClient{id, sessionId, messageChan}
 
 	notify := w.(http.CloseNotifier).CloseNotify()
 	go func() {
