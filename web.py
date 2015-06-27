@@ -43,6 +43,12 @@ all_sessions = {}
 class _Interactive(object):
     socket_writer = None
 
+    def on_open(self):
+        pass
+
+    def on_close(self):
+        pass
+
     def send(self, message, target=None):
         target = target or self.id
         assert '\n' not in message 
@@ -91,13 +97,19 @@ def setup(PageCls=PageBase, SessionCls=SessionBase, host='localhost', port=8001)
                 else:
                     session = SessionCls(session_id, {})
                     all_sessions[session_id] = session
+                    session.on_open()
                 page = PageCls(id, session)
                 session.pages[id] = page
                 all_pages[id] = page
+                page.on_open()
             elif event == 'disconnected':
                 session = all_pages[id].session
                 del session.pages[id]
                 del all_pages[id]
+                page.on_close()
+                if len(session.pages) == 0:
+                    del all_sessions[session.id]
+                    session.on_close()
             elif event == 'call':
                 call = json.loads(params)
                 method = call['method']
