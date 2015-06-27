@@ -27,7 +27,7 @@ type Clients struct {
 	clientsById    map[string]Client
 	subscriptions  map[string]map[Client]bool
 	newClients     chan Client
-	defunctClients chan string
+	defunctClients chan Client
 	calls          chan rpcCall
 }
 
@@ -38,8 +38,8 @@ type Client struct {
 }
 
 type rpcCall struct {
-	id   string
-	body string
+	client Client
+	body   string
 }
 
 func (c *Clients) subscribe(id string, client Client) {
@@ -68,17 +68,16 @@ func (c *Clients) Start(conn net.Conn) {
 			c.subscribe("world", client)
 			fmt.Fprintf(conn, "connected %s %s\n", client.id, client.session)
 			fmt.Printf("-> connected %s %s\n", client.id, client.session)
-		case id := <-c.defunctClients:
-			client := c.clientsById[id]
+		case client := <-c.defunctClients:
 			c.unsubscribe(client.id, client)
 			c.unsubscribe(client.session, client)
 			c.unsubscribe("world", client)
-			delete(c.clientsById, id)
-			fmt.Fprintf(conn, "disconnected %s %s\n", id, client.session)
-			fmt.Printf("-> disconnected %s %s\n", id, client.session)
+			delete(c.clientsById, client.id)
+			fmt.Fprintf(conn, "disconnected %s %s\n", client.id, client.session)
+			fmt.Printf("-> disconnected %s %s\n", client.id, client.session)
 		case call := <-c.calls:
-			fmt.Fprintf(conn, "call %s %s\n", call.id, call.body)
-			fmt.Printf("-> call %s %s\n", call.id, call.body)
+			fmt.Fprintf(conn, "call %s %s\n", call.client.id, call.body)
+			fmt.Printf("-> call %s %s\n", call.client.id, call.body)
 		}
 	}
 }
@@ -90,7 +89,8 @@ func (c *Clients) processCall(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
-	c.calls <- rpcCall{r.URL.Path, string(body)}
+	client := c.clientsById[r.URL.Path]
+	c.calls <- rpcCall{client, string(body)}
 }
 
 func (c *Clients) processStream(w http.ResponseWriter, r *http.Request) {
@@ -117,12 +117,13 @@ func (c *Clients) processStream(w http.ResponseWriter, r *http.Request) {
 
 	id := r.URL.Path
 	messageChan := make(chan string)
-	c.newClients <- Client{id, sessionId, messageChan}
+	client := Client{id, sessionId, messageChan}
+	c.newClients <- client
 
 	notify := w.(http.CloseNotifier).CloseNotify()
 	go func() {
 		<-notify
-		c.defunctClients <- id
+		c.defunctClients <- client
 	}()
 
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -210,7 +211,7 @@ func main() {
 		make(map[string]Client),
 		make(map[string]map[Client]bool),
 		make(chan Client),
-		make(chan string),
+		make(chan Client),
 		make(chan rpcCall),
 	}
 
