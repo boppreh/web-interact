@@ -4,7 +4,15 @@
         <title>Web Interactivity</title>
     </head>
     <body>
-        <script src="/sse.js">
+        <script src="/polyfill.js"></script>
+        <script src="/sse.js"></script>
+
+        <script>
+function appendLine(line) {
+    var lines = get('chat').split('<br>').filter(function(n) { return n.length });
+    lines.push(line);
+    setRaw('chat', lines.slice(-30).join('<br>'))
+}
         </script>
 
         <input type="text" id="name" placeholder="Anon">
@@ -14,7 +22,7 @@
 
         <form onsubmit="call('say', 'message'); set('message', '');"
             action="javascript:void(0);">
-            <input type="text" id="message">
+            <input type="text" id="message" autocomplete="off">
             <input type="submit" value="Send">
         </form>
 

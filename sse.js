@@ -2,7 +2,7 @@
 
 var RAND_ALPHABET = "0123456789abcdef"
 function randId(bits) {
-    var n = bits / Math.log2(RAND_ALPHABET.length);
+    var n = bits / Math.log(RAND_ALPHABET.length, 2);
     var chars = []
     for (var i = 0; i < n; i++) {
         var randIndex = Math.floor(Math.random() * RAND_ALPHABET.length);
@@ -39,7 +39,34 @@ function get(elementId) {
     }
 }
 
+var escapeMap = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+    "/": "&#x2F;",
+};
+var unescapeMap = {};
+for (var key in escapeMap) { unescapeMap[escapeMap[key]] = key; }
+
+function unescapeHtml(string) {
+    return string.replace(/&.+?;/g, function (s) { return unescapeMap[s]; });
+}
+function escapeHtml(string) {
+    return string.replace(/[&<>"'\/]/g, function (s) { return escapeMap[s]; });
+}
+
 function set(elementId, value) {
+    var element = document.getElementById(elementId);
+    if (element.value !== undefined) {
+        element.value = value;
+    } else {
+        element.innerHTML = escapeHtml(value);
+    }
+}
+
+function setRaw(elementId, value) {
     var element = document.getElementById(elementId);
     if (element.value !== undefined) {
         element.value = value;
