@@ -228,5 +228,8 @@ func main() {
 	http.HandleFunc("/sse.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "sse.js")
 	})
+	http.HandleFunc("/polyfill.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "polyfill.js")
+	})
 	panic(http.ListenAndServe(":8000", nil))
 }
