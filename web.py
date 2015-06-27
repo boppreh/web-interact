@@ -73,8 +73,7 @@ class PageBase(_Interactive):
         self.id = id
         self.session = session
 
-def setup(PageCls=PageBase, SessionCls=SessionBase, host='localhost', port=8001,
-          on_connected=lambda: None, on_disconnected=lambda: None):
+def setup(PageCls=PageBase, SessionCls=SessionBase, host='localhost', port=8001):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect(('localhost', 8001))
     reader = s.makefile('r', encoding='utf-8')
@@ -101,15 +100,14 @@ def setup(PageCls=PageBase, SessionCls=SessionBase, host='localhost', port=8001,
                 del all_pages[id]
             elif event == 'call':
                 call = json.loads(params)
-                # Nope, not falling for that.
-                if call['method'] in ['send', 'broadcast']:
-                    continue
-                page = all_pages[id]
                 method = call['method']
+                # Nope, not falling for that.
+                if method in ['send', 'broadcast'] or method.startswith('_'):
+                    continue
                 try:
-                    getattr(page, method)(*call['params'])
+                    getattr(all_pages[id], method)(*call['params'])
                 except AttributeError:
-                    getattr(page.session, method)(*call['params'])
+                    getattr(all_pages[id].session, method)(*call['params'])
 
 
     threading.Thread(target=subroutine).start()
