@@ -6,9 +6,9 @@ class Session(SessionBase):
         self._update_names()
 
     def _update_names(self):
-        template = ', '.join(['<strong>{}</strong>'] * len(all_sessions))
+        template = 'Users online:<br>' + '<br>'.join(['<strong>{}</strong>'] * len(all_sessions))
         users = [s.name or 'Anon' for s in all_sessions.values()]
-        self.set('users_online', self.html(template, *users), 'world')
+        self.set('users-online', self.html(template, *users), 'world')
 
     def change_name(self, new_name):
         self.name = new_name

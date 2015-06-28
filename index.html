@@ -1,11 +1,76 @@
 <!doctype html>
 <html>
     <head>
+		<meta charset="utf-8">
+        <meta name="viewport" content="width=device-width" />
         <title>Web Interactivity</title>
     </head>
     <body>
         <script src="/polyfill.js"></script>
         <script src="/sse.js"></script>
+        <style media="screen" type="text/css">
+html, body {
+    height: 100%;
+    margin: 0;
+
+    font: 16px/150% Georgia, Times, 'Times New Roman', serif;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+    color: #444;
+}
+
+body, #chat-div, #message-div, #name-div {
+    display: flex;
+}
+
+#chat-div {
+    justify-content: flex-end;
+    flex-direction: column;
+    flex: 1;
+}
+
+#chat {
+    overflow: auto;
+    flex: 1;
+    background-color: #2C3E50;
+    color: #CCC;
+    padding: 10px;
+}
+
+#message-div {
+    background-color: #ECF0F1;
+}
+
+#users-online-div {
+    background-color: #3498DB;
+    padding: 10px;
+}
+
+#name-div {
+    margin-bottom: 15px;
+    background-color: #ECF0F1;
+}
+
+#name-div button {
+    white-space: nowrap;
+}
+
+input[type="text"]
+{
+    flex: 1;
+    background: transparent;
+    border: none;
+    margin: 10px;
+
+    outline: none;
+}
+
+@media all and (max-width: 500px) {
+    body {
+        flex-direction: column;
+    }
+}
+
+        </style>
 
         <script>
 function appendLine(line) {
@@ -15,17 +80,23 @@ function appendLine(line) {
 }
         </script>
 
-        <input type="text" id="name" placeholder="Anon">
-        <button onclick="call('change_name', 'name')">Change name</button>
+        <div id="chat-div">
+            <div id="chat"></div>
 
-        <div id="chat"></div>
+            <form id="message-div" onsubmit="call('say', 'message'); set('message', '');"
+                action="javascript:void(0);">
+                <input type="text" id="message" autocomplete="off">
+                <input type="submit" value="Send">
+            </form>
+        </div>
 
-        <form onsubmit="call('say', 'message'); set('message', '');"
-            action="javascript:void(0);">
-            <input type="text" id="message" autocomplete="off">
-            <input type="submit" value="Send">
-        </form>
+        <div id="users-online-div">
+            <form id="name-div" onsubmit="call('change_name', 'name');" action="javascript:void(0);">
+                <input type="text" id="name" placeholder="Anon">
+                <input type="submit" value="Change name">
+            </form>
 
-        <p>Users online: <span id="users_online"></span></p>
+            <div id="users-online"></div>
+        </div>
     </body>
 </html>
