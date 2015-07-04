@@ -5,6 +5,7 @@ import json
 from collections import defaultdict
 
 from html import escape as escape_html
+from urllib.parse import quote_plus
 
 class _Html(object):
     def __init__(self, template, values):
@@ -27,8 +28,11 @@ class _Interactive(object):
 
     def eval(self, message, target=None):
         target = target or self.id
-        assert '\n' not in message 
-        _Interactive.socket_writer.write('send {} {}\n'.format(target, message))
+        if '\n' in message:
+            line = 'send {} eval(decodeURI("{}"))\n'.format(target, quote_plus(message))
+        else:
+            line = 'send {} {}\n'.format(target, message)
+        _Interactive.socket_writer.write(line)
         _Interactive.socket_writer.flush()
 
     def call(self, method, *args, target=None):
