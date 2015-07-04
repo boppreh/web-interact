@@ -5,10 +5,10 @@ class Session(SessionBase):
         self.name = ''
         self._update_names()
 
-    def _update_names(self):
+    def _update_names(self, target='world'):
         template = 'Users online:<br>' + '<br>'.join(['<strong>{}</strong>'] * len(all_sessions))
         users = [s.name or 'Anon' for s in all_sessions.values()]
-        self.set('users-online', self.html(template, *users), 'world')
+        self.set('users-online', self.html(template, *users), target)
 
     def change_name(self, new_name):
         self.name = new_name
@@ -21,6 +21,7 @@ class Session(SessionBase):
 class Page(PageBase):
     def on_open(self):
         self.set('name', self.session.name)
+        self.session._update_names(target=self.id)
 
     def say(self, message):
         template = '<strong>{}</strong>: {}</br>'
