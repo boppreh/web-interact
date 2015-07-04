@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/boppreh/gohandlers"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -219,17 +220,10 @@ func main() {
 
 	go ReadCommands(conn, clients)
 
-	http.Handle("/call/", http.StripPrefix("/call/", http.HandlerFunc(clients.processCall)))
-	http.Handle("/events/", http.StripPrefix("/events/", http.HandlerFunc(clients.processStream)))
-
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "index.html")
-	})
-	http.HandleFunc("/sse.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "sse.js")
-	})
-	http.HandleFunc("/polyfill.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "polyfill.js")
-	})
-	panic(http.ListenAndServe(":8080", nil))
+	handlers.ServeIndex("index.html")
+	handlers.ServeFile("sse.js")
+	handlers.ServeFile("polyfill.js")
+	handlers.HandleFuncStripped("/call", clients.processCall)
+	handlers.HandleFuncStripped("/events", clients.processStream)
+	handlers.Start("8080")
 }
