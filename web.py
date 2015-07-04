@@ -61,7 +61,7 @@ class PageBase(_Interactive):
         self.id = id
         self.session = session
 
-def setup(PageCls=PageBase, SessionCls=SessionBase, host='localhost', port=8001):
+def setup(PageCls=PageBase, SessionCls=SessionBase, host='localhost', port=8001, auto_destroy_sessions=False):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect(('localhost', 8001))
     reader = s.makefile('r', encoding='utf-8')
@@ -71,7 +71,7 @@ def setup(PageCls=PageBase, SessionCls=SessionBase, host='localhost', port=8001)
     def subroutine():
         while True:
             line = reader.readline()
-            event, id, params = re.match(r'(\S+) (\S+) (.+)', line).groups()
+            event, id, params = re.match(r'(\S+) (\S+) (.*)', line).groups()
             if event == 'connected':
                 session_id = params
                 if session_id in all_sessions:
@@ -89,7 +89,7 @@ def setup(PageCls=PageBase, SessionCls=SessionBase, host='localhost', port=8001)
                 del session.pages[id]
                 del all_pages[id]
                 page.on_close()
-                if len(session.pages) == 0:
+                if auto_destroy_sessions and len(session.pages) == 0:
                     del all_sessions[session.id]
                     session.on_close()
             elif event == 'call':
