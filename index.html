@@ -10,65 +10,94 @@
         <script src="/sse.js"></script>
         <style media="screen" type="text/css">
 html, body {
-    margin: 0px;
-    width: 100%;
     height: 100%;
+    margin: 0;
+
+    font: 16px/150% Georgia, Times, 'Times New Roman', serif;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+    color: #444;
 }
 
-body {
+body, #chat-div, #message-div, #name-div {
     display: flex;
-}
-
-#chat {
-    flex: 1;
-    background-color: #CECECE;
-    word-break: break-all;
-    overflow-y: scroll;
 }
 
 #chat-div {
-    flex: 1;
-    display: flex;
+    justify-content: flex-end;
     flex-direction: column;
-}
-
-#chat-input {
-    background-color: #EEE;
-    display: flex;
-}
-
-#message {
     flex: 1;
 }
+
+#chat {
+    overflow: auto;
+    flex: 1;
+    background-color: #2C3E50;
+    color: #CCC;
+    padding: 10px;
+    word-break: break-all;
+}
+
+#message-div {
+    background-color: #ECF0F1;
+}
+
+#users-online-div {
+    background-color: #3498DB;
+    padding: 10px;
+}
+
+#name-div {
+    margin-bottom: 15px;
+    background-color: #ECF0F1;
+}
+
+#name-div button {
+    white-space: nowrap;
+}
+
+input[type="text"]
+{
+    flex: 1;
+    background: transparent;
+    border: none;
+    margin: 10px;
+
+    outline: none;
+}
+
+@media all and (max-width: 500px) {
+    body {
+        flex-direction: column;
+    }
+}
+
         </style>
 
         <script>
-function onDirect(user, message) {
-    setRaw('chat', get('chat') + "(From <strong>" + user + "</strong>): " + message + "<br>");
-}
-function onGlobal(user, message) {
-    setRaw('chat', get('chat') + "<strong>" + user + "</strong>: " + message + "<br>");
+function appendLine(line) {
+    var lines = get('chat').split('<br>').filter(function(n) { return n.length });
+    lines.push(line);
+    setRaw('chat', lines.slice(-30).join('<br>'))
 }
         </script>
 
         <div id="chat-div">
-                <div id="chat"></div>
+            <div id="chat"></div>
 
-                <form id="chat-input" onsubmit="call('say', 'target', 'message'); set('message', '');" action="javascript:void(0);">
-
-                    <input id="target" placeholder="world" type="text">
-                    <input id="message" placeholder="message" type="text">
-                    <button type="submit">Send</button>
-                </form>
+            <form id="message-div" onsubmit="call('say', 'message'); set('message', '');"
+                action="javascript:void(0);">
+                <input type="text" id="message" autocomplete="off">
+                <input type="submit" value="Send">
+            </form>
         </div>
 
-        <div id="code-div">
-               <p>Session: <span id="session_id">session3b8280a901fbedc70161e82f4a3524bb</span></p>
+        <div id="users-online-div">
+            <form id="name-div" onsubmit="call('change_name', 'name');" action="javascript:void(0);">
+                <input type="text" id="name" placeholder="Anon">
+                <input type="submit" value="Change name">
+            </form>
 
-               <textarea style="width: 414px; height: 35px;" id="code" oninput="call('save_code', 'code');" placeholder="code"></textarea>
-        </div>    
-
-</body>
-
+            <div id="users-online"></div>
+        </div>
     </body>
 </html>
