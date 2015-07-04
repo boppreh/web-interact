@@ -149,7 +149,7 @@ func (c *Clients) processStream(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-var pattern = regexp.MustCompile(`(\S+) (\S+) (.+)`)
+var pattern = regexp.MustCompile(`(\S+) (\S+) (.*)`)
 
 func ReadCommands(conn net.Conn, clients *Clients) {
 	reader := bufio.NewReader(conn)
@@ -231,5 +231,5 @@ func main() {
 	http.HandleFunc("/polyfill.js", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "polyfill.js")
 	})
-	panic(http.ListenAndServe(":8000", nil))
+	panic(http.ListenAndServe(":8080", nil))
 }
