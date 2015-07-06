@@ -77,7 +77,8 @@ input[type="text"]
 function appendLine(line) {
     var lines = get('chat').split('<br>').filter(function(n) { return n.length });
     lines.push(line);
-    setRaw('chat', lines.slice(-30).join('<br>'))
+    setRaw('chat', lines.slice(-30).join('<br>'));
+    document.getElementById("chat").scrollTo(0, document.getElementById("chat").scrollHeight);
 }
         </script>
 
