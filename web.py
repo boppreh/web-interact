@@ -71,7 +71,7 @@ def setup(PageCls=PageBase, SessionCls=SessionBase, host='localhost', port=8001,
     def subroutine():
         while True:
             line = reader.readline()
-            event, id, params = re.match(r'(\S+) (\S+) (.*)', line).groups()
+            event, id, params = re.match(r'(\S+) (\S*) (.*)', line).groups()
             if event == 'connected':
                 session_id = params
                 if session_id in all_sessions:
