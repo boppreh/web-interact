@@ -28,4 +28,4 @@ class Page(PageBase):
         line = self.html(template, self.session.name or 'Anon', message)
         self.call('appendLine', line, target='world')
 
-setup(Page, Session)
+setup(Page, Session, auto_destroy_sessions=True)
