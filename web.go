@@ -30,6 +30,7 @@ type Clients struct {
 	newClients     chan Client
 	defunctClients chan Client
 	calls          chan rpcCall
+	uploads        chan handlers.Upload
 }
 
 type Client struct {
@@ -78,7 +79,9 @@ func (c *Clients) Start(conn net.Conn) {
 			fmt.Printf("-> disconnected %s %s\n", client.id, client.session)
 		case call := <-c.calls:
 			fmt.Fprintf(conn, "call %s %s\n", call.client.id, call.body)
-			fmt.Printf("-> call %s %s\n", call.client.id, call.body)
+		case upload := <-c.uploads:
+			fmt.Fprintf(conn, "upload %s %s\n", upload.Path, upload.Name)
+			fmt.Printf("-> upload %s %s\n", upload.Path, upload.Name)
 		}
 	}
 }
@@ -173,7 +176,6 @@ func ReadCommands(conn net.Conn, clients *Clients) {
 		command := parts[1]
 		id := parts[2]
 		params := parts[3]
-		fmt.Println("<- " + line)
 		switch command {
 		case "send":
 			for client, _ := range clients.subscriptions[id] {
@@ -214,6 +216,7 @@ func main() {
 		make(chan Client),
 		make(chan Client),
 		make(chan rpcCall),
+		make(chan handlers.Upload),
 	}
 
 	go clients.Start(conn)
@@ -223,6 +226,12 @@ func main() {
 	handlers.ServeIndex("index.html")
 	handlers.ServeFile("sse.js")
 	handlers.ServeFile("polyfill.js")
+	handlers.ServeFile("common.js")
+	handlers.ServeFile("serviceworker.js")
+	handlers.ServeDir("files")
+	handlers.AllowUpload("/upload", "file", "files/uploaded", func(u handlers.Upload) {
+		clients.uploads <- u
+	})
 	handlers.HandleFuncStripped("/call", clients.processCall)
 	handlers.HandleFuncStripped("/events", clients.processStream)
 	handlers.Start("8080")
